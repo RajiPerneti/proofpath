@@ -1,0 +1,119 @@
+import React, { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
+import LandingPage from './pages/LandingPage';
+import CreateAssessmentPage from './pages/CreateAssessmentPage';
+import InterviewWorkspacePage from './pages/InterviewWorkspacePage';
+import CompetencyExplorerPage from './pages/CompetencyExplorerPage';
+import TechnicalChallengePage from './pages/TechnicalChallengePage';
+import EvidenceTimelinePage from './pages/EvidenceTimelinePage';
+import FinalReportPage from './pages/FinalReportPage';
+import AssessmentHistoryPage from './pages/AssessmentHistoryPage';
+import { api } from './api/client';
+
+export default function App() {
+  const [currentRoute, setCurrentRoute] = useState('landing');
+  const [assessmentId, setAssessmentId] = useState(() => {
+    return localStorage.getItem('proofpath_active_assessment_id') || null;
+  });
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      try {
+        const res = await api.checkHealth();
+        setAiConfigured(res.aiEngine === 'gemini_live');
+      } catch (e) {
+        console.warn('Backend health check error:', e);
+      }
+    }
+    check();
+  }, []);
+
+  const handleSetAssessmentId = (id) => {
+    setAssessmentId(id);
+    if (id) {
+      localStorage.setItem('proofpath_active_assessment_id', id);
+    } else {
+      localStorage.removeItem('proofpath_active_assessment_id');
+    }
+  };
+
+  const navigate = (route, params = {}) => {
+    if (params.id) {
+      handleSetAssessmentId(params.id);
+    }
+    setCurrentRoute(route);
+    setSidebarOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
+      {/* Compact Navigation Sidebar */}
+      <Sidebar
+        currentAssessmentId={assessmentId}
+        currentRoute={currentRoute}
+        navigate={navigate}
+        aiConfigured={aiConfigured}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Top Header Bar */}
+        <Navbar
+          currentAssessmentId={assessmentId}
+          currentRoute={currentRoute}
+          navigate={navigate}
+          aiConfigured={aiConfigured}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        {/* Dynamic Route Pages */}
+        <main className="flex-1 pb-12">
+          {currentRoute === 'landing' && (
+            <LandingPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+          )}
+          {currentRoute === 'create' && (
+            <CreateAssessmentPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+          )}
+          {currentRoute === 'interview' && (
+            <InterviewWorkspacePage assessmentId={assessmentId} navigate={navigate} />
+          )}
+          {currentRoute === 'competencies' && (
+            <CompetencyExplorerPage assessmentId={assessmentId} navigate={navigate} />
+          )}
+          {currentRoute === 'code' && (
+            <TechnicalChallengePage assessmentId={assessmentId} navigate={navigate} />
+          )}
+          {currentRoute === 'timeline' && (
+            <EvidenceTimelinePage assessmentId={assessmentId} navigate={navigate} />
+          )}
+          {currentRoute === 'report' && (
+            <FinalReportPage assessmentId={assessmentId} navigate={navigate} />
+          )}
+          {currentRoute === 'history' && (
+            <AssessmentHistoryPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+          )}
+        </main>
+
+        {/* Minimal Footer */}
+        <footer className="border-t border-slate-200/80 bg-white py-4 text-xs text-slate-500">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">ProofPath</span>
+              <span>•</span>
+              <span>Evidence-Driven Adaptive Assessment Intelligence</span>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Google Student Club Hackathon 2026 • SQLite Persistent Engine
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
