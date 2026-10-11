@@ -1,6 +1,6 @@
 // ProofPath API Client
 
-const API_BASE = '/api';
+const API_BASE = 'https://proofpath-57ew.onrender.com/api';
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
