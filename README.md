@@ -115,34 +115,41 @@ ProofPath supports two operating modes:
 
 ## 5. Technology Stack
 
-* **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons (Pure JavaScript and JSX, no TypeScript, no Next.js).
-* **Backend**: Node.js, Express, REST API.
-* **Database**: SQLite via native `node:sqlite` (zero external C++ compilation required, persisted in `backend/data/proofpath.sqlite`).
-* **Testing**: Built-in `node:test` runner with 16 automated unit and integration tests.
+* **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons (Pure JavaScript and JSX, ErrorBoundary, Camera preview, Web Speech API dictation).
+* **Backend**: Node.js, Express, REST API, bcryptjs password hashing, JWT token authentication, Multer multipart storage, pdf-parse v2 text extraction.
+* **Database**: MongoDB with Mongoose schemas (separate test database isolation with `proofpath_test`, automatic SQLite legacy migration).
+* **Testing**: Built-in `node:test` runner with 43 automated unit and integration tests across 7 test suites.
 
 ---
 
 ## 6. Setup & Execution Instructions
 
 ### Prerequisites
-* Node.js v20+ or v24+
+* Node.js v20+ or v22+
+* MongoDB running locally on port 27017 (or `MONGODB_URI` connection string)
 * Python 3.10+ (for hands-on Python coding challenge)
 
 ### Step 1: Install Dependencies
 ```bash
-# Install backend dependencies
-npm install --prefix backend
-
-# Install frontend dependencies
-npm install --prefix frontend
+# Install root, backend, and frontend dependencies
+npm run install:all
 ```
 
-### Step 2: Build Frontend
+### Step 2: Environment Configuration
+Copy `backend/.env.example` to `backend/.env` (optional for local defaults):
+```env
+PORT=5000
+MONGODB_URI=mongodb://127.0.0.1:27017/proofpath
+MONGODB_TEST_URI=mongodb://127.0.0.1:27017/proofpath_test
+JWT_SECRET=your_strong_jwt_secret_here_32_characters_minimum
+```
+
+### Step 3: Build Frontend
 ```bash
 npm run build
 ```
 
-### Step 3: Run the Application
+### Step 4: Run the Application
 ```bash
 # Production mode (Backend serves API and built frontend on port 5000):
 npm start
@@ -150,38 +157,37 @@ npm start
 # Or Development mode with hot-reloading (Vite on 5173, Express on 5000):
 npm run dev
 ```
-Open **[http://localhost:5000](http://localhost:5000)** in your browser!
+Open **[http://localhost:5000](http://localhost:5000)** (or [http://localhost:5173](http://localhost:5173) in dev mode) in your browser!
 
-### Step 4: Run Tests
+### Step 5: Run Tests
 ```bash
 npm test
 ```
-All 16 unit and integration tests will execute and report passing results.
-
-### Step 5: Run Live Verification Script
-```bash
-node scripts/verify_live.js
-```
+All 43 unit and integration tests across 7 test suites will execute against the isolated `proofpath_test` database and report passing results.
 
 ---
 
 ## 7. REST API Documentation
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Health status and active AI engine mode |
-| `GET` | `/api/templates` | Pre-configured job role templates |
-| `GET` | `/api/assessments` | List all historical assessments |
-| `POST` | `/api/assessments` | Create assessment, seed competencies and initial question |
-| `GET` | `/api/assessments/:id` | Fetch assessment state, current question, and coverage |
-| `DELETE` | `/api/assessments/:id` | Delete assessment from SQLite database |
-| `POST` | `/api/assessments/:id/submit` | Submit response, evaluate rubric, trigger adaptive engine |
-| `GET` | `/api/assessments/:id/events` | Fetch all evidence ledger events |
-| `GET` | `/api/assessments/:id/decisions` | Fetch adaptive decision history |
-| `GET` | `/api/assessments/:id/competencies` | Fetch deep-dive competency details, quotes, and gaps |
-| `POST` | `/api/assessments/:id/run-code` | Safely execute Python code against test suite |
-| `POST` | `/api/assessments/:id/submit-code` | Submit Python solution into evidence ledger |
-| `GET` | `/api/assessments/:id/report` | Compile and retrieve final evidence report |
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/health` | Public | Health status, MongoDB connection status, and active AI engine mode |
+| `POST` | `/api/auth/register` | Public | Register new evaluator account (bcrypt password hashing) |
+| `POST` | `/api/auth/login` | Public | Authenticate user credentials and return JWT Bearer token |
+| `GET` | `/api/auth/me` | Bearer | Fetch authenticated user profile |
+| `POST` | `/api/resumes/parse` | Bearer | Parse PDF or TXT resume document in-memory (5MB cap) |
+| `GET` | `/api/templates` | Public | Pre-configured job role templates and rubrics |
+| `GET` | `/api/assessments` | Bearer | List assessments owned by the authenticated user |
+| `POST` | `/api/assessments` | Bearer | Create assessment with optional resume, seed competencies & questions |
+| `GET` | `/api/assessments/:id` | Bearer | Fetch owned assessment state, current question, and coverage |
+| `DELETE` | `/api/assessments/:id` | Bearer | Delete owned assessment and associated records |
+| `POST` | `/api/assessments/:id/submit` | Bearer | Submit response, evaluate rubric, trigger adaptive branching |
+| `GET` | `/api/assessments/:id/events` | Bearer | Fetch evidence ledger events and quote excerpts |
+| `GET` | `/api/assessments/:id/decisions` | Bearer | Fetch adaptive decision history |
+| `GET` | `/api/assessments/:id/competencies` | Bearer | Fetch competency details, verified quotes, and gaps |
+| `POST` | `/api/assessments/:id/run-code` | Bearer | Safely execute Python code in sandbox against test suite |
+| `POST` | `/api/assessments/:id/submit-code` | Bearer | Submit Python solution into evidence ledger |
+| `GET` | `/api/assessments/:id/report` | Bearer | Compile and retrieve final evidence report |
 
 ---
 

@@ -10,10 +10,12 @@ const { Assessment } = require('../../src/models');
 describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
   let server;
   let baseUrl;
+  let authToken;
   let createdAssessmentId;
   let firstQuestionId;
 
   before(async () => {
+    process.env.NODE_ENV = 'test';
     // Connect to MongoDB
     await connectDb();
 
@@ -25,9 +27,28 @@ describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
         resolve();
       });
     });
+
+    // Clean up old test user if exists and register a fresh test user
+    const { User } = require('../../src/models');
+    await User.deleteOne({ email: 'flowtest@flow-test.proofpath.io' });
+
+    const regRes = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Flow Test User',
+        email: 'flowtest@flow-test.proofpath.io',
+        password: 'Password123!'
+      })
+    });
+    const regData = await regRes.json();
+    authToken = regData.token;
   });
 
   after(async () => {
+    const { User } = require('../../src/models');
+    await User.deleteOne({ email: 'flowtest@flow-test.proofpath.io' });
+
     // Clean up test assessment if created
     if (createdAssessmentId) {
       await Assessment.deleteOne({ id: createdAssessmentId });
@@ -63,7 +84,10 @@ describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
 
     const res = await fetch(`${baseUrl}/assessments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
       body: JSON.stringify(payload)
     });
 
@@ -82,7 +106,9 @@ describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
   });
 
   test('3. GET /assessments/:id retrieves assessment state from MongoDB', async () => {
-    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}`);
+    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.assessment.candidate_name, 'Jane Developer');
@@ -96,7 +122,10 @@ describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
 
     const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
       body: JSON.stringify({
         responseText,
         questionId: firstQuestionId
@@ -113,7 +142,9 @@ describe('ProofPath End-to-End API Integration Tests (MongoDB)', () => {
   });
 
   test('5. GET /assessments/:id/events retrieves evidence ledger and timeline', async () => {
-    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/events`);
+    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/events`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.events.length, 1);
@@ -175,7 +206,10 @@ class LRUCache:
 
     const runRes = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/run-code`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
       body: JSON.stringify({
         code: validPythonLRU,
         questionId: firstQuestionId
@@ -188,7 +222,9 @@ class LRUCache:
   });
 
   test('7. GET /assessments/:id/report compiles final assessment report', async () => {
-    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/report`);
+    const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}/report`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.ok(data.report.summary);
@@ -198,11 +234,14 @@ class LRUCache:
 
   test('8. DELETE /assessments/:id deletes the assessment from MongoDB', async () => {
     const res = await fetch(`${baseUrl}/assessments/${createdAssessmentId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${authToken}` }
     });
     assert.strictEqual(res.status, 200);
 
-    const getRes = await fetch(`${baseUrl}/assessments/${createdAssessmentId}`);
+    const getRes = await fetch(`${baseUrl}/assessments/${createdAssessmentId}`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
     assert.strictEqual(getRes.status, 404);
 
     // Verify it is also gone from MongoDB collection

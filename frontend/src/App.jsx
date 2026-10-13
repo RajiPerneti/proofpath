@@ -10,8 +10,13 @@ import EvidenceTimelinePage from './pages/EvidenceTimelinePage';
 import FinalReportPage from './pages/FinalReportPage';
 import AssessmentHistoryPage from './pages/AssessmentHistoryPage';
 import { api } from './api/client';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthModal from './components/AuthModal';
+import AuthPage from './pages/AuthPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
-export default function App() {
+function MainApp() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [currentRoute, setCurrentRoute] = useState('landing');
   const [assessmentId, setAssessmentId] = useState(() => {
     return localStorage.getItem('proofpath_active_assessment_id') || null;
@@ -49,6 +54,22 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-r-transparent" />
+          <p className="mt-3 text-xs font-semibold text-slate-500">Loading ProofPath...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthenticated visitors see dedicated login/signup page before accessing the dashboard
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
       {/* Compact Navigation Sidebar */}
@@ -74,30 +95,32 @@ export default function App() {
 
         {/* Dynamic Route Pages */}
         <main className="flex-1 pb-12">
-          {currentRoute === 'landing' && (
-            <LandingPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
-          )}
-          {currentRoute === 'create' && (
-            <CreateAssessmentPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
-          )}
-          {currentRoute === 'interview' && (
-            <InterviewWorkspacePage assessmentId={assessmentId} navigate={navigate} />
-          )}
-          {currentRoute === 'competencies' && (
-            <CompetencyExplorerPage assessmentId={assessmentId} navigate={navigate} />
-          )}
-          {currentRoute === 'code' && (
-            <TechnicalChallengePage assessmentId={assessmentId} navigate={navigate} />
-          )}
-          {currentRoute === 'timeline' && (
-            <EvidenceTimelinePage assessmentId={assessmentId} navigate={navigate} />
-          )}
-          {currentRoute === 'report' && (
-            <FinalReportPage assessmentId={assessmentId} navigate={navigate} />
-          )}
-          {currentRoute === 'history' && (
-            <AssessmentHistoryPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
-          )}
+          <ErrorBoundary onReset={() => setCurrentRoute('landing')}>
+            {currentRoute === 'landing' && (
+              <LandingPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+            )}
+            {currentRoute === 'create' && (
+              <CreateAssessmentPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+            )}
+            {currentRoute === 'interview' && (
+              <InterviewWorkspacePage assessmentId={assessmentId} navigate={navigate} />
+            )}
+            {currentRoute === 'competencies' && (
+              <CompetencyExplorerPage assessmentId={assessmentId} navigate={navigate} />
+            )}
+            {currentRoute === 'code' && (
+              <TechnicalChallengePage assessmentId={assessmentId} navigate={navigate} />
+            )}
+            {currentRoute === 'timeline' && (
+              <EvidenceTimelinePage assessmentId={assessmentId} navigate={navigate} />
+            )}
+            {currentRoute === 'report' && (
+              <FinalReportPage assessmentId={assessmentId} navigate={navigate} />
+            )}
+            {currentRoute === 'history' && (
+              <AssessmentHistoryPage navigate={navigate} setAssessmentId={handleSetAssessmentId} />
+            )}
+          </ErrorBoundary>
         </main>
 
         {/* Minimal Footer */}
@@ -109,11 +132,22 @@ export default function App() {
               <span>Evidence-Driven Adaptive Assessment Intelligence</span>
             </div>
             <div className="text-[11px] text-slate-400">
-              Google Student Club Hackathon 2026 • SQLite Persistent Engine
+              Google Student Club Hackathon 2026 • Evidence-Backed Engine
             </div>
           </div>
         </footer>
       </div>
+
+      {/* Global Authentication Modal */}
+      <AuthModal />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }

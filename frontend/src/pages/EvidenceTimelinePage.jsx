@@ -21,6 +21,7 @@ export default function EvidenceTimelinePage({ assessmentId, navigate }) {
   const [events, setEvents] = useState([]);
   const [assessment, setAssessment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // 'all', 'demonstrated', 'gaps'
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,6 +29,7 @@ export default function EvidenceTimelinePage({ assessmentId, navigate }) {
     async function load() {
       try {
         setLoading(true);
+        setError(null);
         const asmtData = await api.getAssessment(assessmentId);
         setAssessment(asmtData.assessment);
 
@@ -35,11 +37,17 @@ export default function EvidenceTimelinePage({ assessmentId, navigate }) {
         setEvents(evData.events || []);
       } catch (err) {
         console.error(err);
+        setError(err.message || 'Failed to load timeline');
       } finally {
         setLoading(false);
       }
     }
-    if (assessmentId) load();
+    if (assessmentId) {
+      load();
+    } else {
+      setLoading(false);
+      setError('No assessment selected.');
+    }
   }, [assessmentId]);
 
   if (loading) {

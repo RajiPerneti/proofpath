@@ -182,7 +182,7 @@ class LRUCache:
           },
           {
             name: 'Eviction on Capacity Exceeded',
-            code: 'cache = LRUCache(2); cache.put(1, 1); cache.put(2, 2); cache.put(3, 3); assert cache.get(2) == -1, f"Expected key 2 evicted, got {cache.get(2)}"'
+            code: 'cache = LRUCache(2); cache.put(1, 1); cache.put(2, 2); cache.put(3, 3); assert cache.get(1) == -1, f"Expected key 1 evicted, got {cache.get(1)}"'
           },
           {
             name: 'Get Updates Recency (Prevents Eviction)',

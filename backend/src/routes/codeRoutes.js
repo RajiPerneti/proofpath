@@ -9,11 +9,12 @@ const {
 } = require('../models');
 const { runPythonCodeSafely } = require('../engine/codeRunner');
 const { selectNextAdaptiveQuestion, computeCompetencyCoverage } = require('../engine/adaptiveEngine');
+const { requireAuth, checkAssessmentOwnership } = require('../middleware/auth');
 
 const router = express.Router();
 
 // POST /api/assessments/:id/run-code - Safe isolated test run (does not record as final answer)
-router.post('/assessments/:id/run-code', async (req, res) => {
+router.post('/assessments/:id/run-code', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
   const { code, questionId } = req.body;
 
@@ -50,7 +51,7 @@ router.post('/assessments/:id/run-code', async (req, res) => {
 });
 
 // POST /api/assessments/:id/submit-code - Submit code solution, record evidence into ledger, trigger adaptive engine
-router.post('/assessments/:id/submit-code', async (req, res) => {
+router.post('/assessments/:id/submit-code', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
   const { code, questionId } = req.body;
 

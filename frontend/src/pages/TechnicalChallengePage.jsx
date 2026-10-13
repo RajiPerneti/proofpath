@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import CameraPreview from '../components/CameraPreview';
 import { Terminal, Play, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowRight, RotateCcw, Check, Sparkles } from 'lucide-react';
 
 export default function TechnicalChallengePage({ assessmentId, navigate }) {
@@ -142,7 +143,11 @@ class LRUCache:
         setLoading(false);
       }
     }
-    if (assessmentId) load();
+    if (assessmentId) {
+      load();
+    } else {
+      setLoading(false);
+    }
   }, [assessmentId]);
 
   const handleRunCode = async () => {
@@ -207,6 +212,9 @@ class LRUCache:
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Challenge Specs & Test Criteria (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
+          {/* Optional Local Camera Preview */}
+          <CameraPreview compact={true} />
+
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Problem Statement</span>

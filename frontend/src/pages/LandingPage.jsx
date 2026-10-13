@@ -13,8 +13,10 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function LandingPage({ navigate, setAssessmentId }) {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const [assessments, setAssessments] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +30,13 @@ export default function LandingPage({ navigate, setAssessmentId }) {
     try {
       setLoading(true);
       const [asmtData, tmplData] = await Promise.all([
-        api.getAssessments(),
-        api.getTemplates()
+        isAuthenticated
+          ? api.getAssessments().catch((err) => {
+              console.warn('Could not load assessments:', err.message);
+              return { assessments: [] };
+            })
+          : Promise.resolve({ assessments: [] }),
+        api.getTemplates().catch(() => ({ templates: [] }))
       ]);
       setAssessments(asmtData.assessments || []);
       setTemplates(tmplData.templates || []);
@@ -42,7 +49,7 @@ export default function LandingPage({ navigate, setAssessmentId }) {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleDelete = async (id, title, e) => {
     e.stopPropagation();
@@ -118,6 +125,31 @@ export default function LandingPage({ navigate, setAssessmentId }) {
           </button>
         </div>
       </div>
+
+      {/* Guest Mode Callout */}
+      {!isAuthenticated && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs shrink-0">
+              <Layers className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-900">
+                You are currently viewing ProofPath as a guest
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Sign in or register to securely save and access your private assessments and evidence ledgers.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openAuthModal('login')}
+            className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+          >
+            Sign In / Register
+          </button>
+        </div>
+      )}
 
       {/* 4 Compact Metric Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

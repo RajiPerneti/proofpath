@@ -28,15 +28,24 @@ export default function FinalReportPage({ assessmentId, navigate }) {
     async function load() {
       try {
         setLoading(true);
+        setError(null);
         const data = await api.getReport(assessmentId);
+        if (!data || !data.report || !data.assessment) {
+          throw new Error('Report data is not available for this assessment.');
+        }
         setReportData(data);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Failed to load report');
       } finally {
         setLoading(false);
       }
     }
-    if (assessmentId) load();
+    if (assessmentId) {
+      load();
+    } else {
+      setLoading(false);
+      setError('No assessment selected.');
+    }
   }, [assessmentId]);
 
   const handlePrint = () => {
@@ -44,7 +53,7 @@ export default function FinalReportPage({ assessmentId, navigate }) {
   };
 
   const handleCopyMarkdown = () => {
-    if (!reportData) return;
+    if (!reportData || !reportData.assessment || !reportData.report) return;
     const { assessment, report } = reportData;
 
     let md = `# ProofPath Evidence-Backed Technical Assessment Report\n\n`;
@@ -94,7 +103,7 @@ export default function FinalReportPage({ assessmentId, navigate }) {
     );
   }
 
-  if (error || !reportData) {
+  if (error || !reportData || !reportData.assessment || !reportData.report) {
     return (
       <div className="mx-auto max-w-lg p-8 text-center text-slate-600">
         <AlertTriangle className="mx-auto h-8 w-8 text-rose-500" />
@@ -132,8 +141,14 @@ export default function FinalReportPage({ assessmentId, navigate }) {
           <h2 className="text-xl font-bold tracking-tight text-slate-900 mt-1">
             Evidence-Backed Assessment Report
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {assessment.candidate_name} • {assessment.job_title}
+          <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+            <span>{assessment.candidate_name} • {assessment.job_title}</span>
+            {assessment.resume_filename && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                <FileText className="h-3 w-3" />
+                <span>Resume: {assessment.resume_filename}</span>
+              </span>
+            )}
           </p>
         </div>
 

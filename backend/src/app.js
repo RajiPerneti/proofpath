@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
 
+const authRoutes = require('./routes/authRoutes');
+const resumeRoutes = require('./routes/resumeRoutes');
 const assessmentRoutes = require('./routes/assessmentRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const codeRoutes = require('./routes/codeRoutes');
@@ -33,6 +35,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/resumes', resumeRoutes);
 app.use('/api', assessmentRoutes);
 app.use('/api', interviewRoutes);
 app.use('/api', codeRoutes);

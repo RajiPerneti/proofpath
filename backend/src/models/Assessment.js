@@ -7,6 +7,11 @@ const assessmentSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
+  user_id: {
+    type: String,
+    default: null,
+    index: true
+  },
   title: {
     type: String,
     required: true
@@ -51,6 +56,14 @@ const assessmentSchema = new mongoose.Schema({
     type: String,
     required: true,
     default: 'deterministic_demo'
+  },
+  resume_filename: {
+    type: String,
+    default: null
+  },
+  resume_text: {
+    type: String,
+    default: null
   },
   created_at: {
     type: String,

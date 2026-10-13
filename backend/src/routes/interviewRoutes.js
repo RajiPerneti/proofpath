@@ -16,6 +16,7 @@ const {
   selectNextAdaptiveQuestion,
   computeCompetencyCoverage
 } = require('../engine/adaptiveEngine');
+const { requireAuth, checkAssessmentOwnership } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -261,7 +262,7 @@ async function generateAndSaveFinalReport(assessmentId) {
 
 // POST /api/assessments/:id/submit
 // Submit answer, evaluate against rubric, and trigger adaptive selection.
-router.post('/assessments/:id/submit', async (req, res) => {
+router.post('/assessments/:id/submit', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
   const { responseText, questionId } = req.body;
 
@@ -475,7 +476,7 @@ router.post('/assessments/:id/submit', async (req, res) => {
 
 // GET /api/assessments/:id/events
 // Evidence ledger and timeline.
-router.get('/assessments/:id/events', async (req, res) => {
+router.get('/assessments/:id/events', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -530,7 +531,7 @@ router.get('/assessments/:id/events', async (req, res) => {
 
 // GET /api/assessments/:id/decisions
 // Adaptive decisions log.
-router.get('/assessments/:id/decisions', async (req, res) => {
+router.get('/assessments/:id/decisions', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -577,7 +578,7 @@ router.get('/assessments/:id/decisions', async (req, res) => {
 
 // GET /api/assessments/:id/report
 // Fetch the latest final report.
-router.get('/assessments/:id/report', async (req, res) => {
+router.get('/assessments/:id/report', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {

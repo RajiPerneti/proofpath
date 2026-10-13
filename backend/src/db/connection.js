@@ -7,12 +7,19 @@ function sanitizeMongoUri(uri) {
   return uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
 }
 
+function getMongoUri() {
+  if (process.env.NODE_ENV === 'test') {
+    return process.env.MONGODB_TEST_URI || 'mongodb://127.0.0.1:27017/proofpath_test';
+  }
+  return process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/proofpath';
+}
+
 async function connectDb() {
   if (isConnected && mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/proofpath';
+  const mongoUri = getMongoUri();
   const sanitized = sanitizeMongoUri(mongoUri);
 
   try {
@@ -46,5 +53,6 @@ module.exports = {
   connectDb,
   closeDb,
   isDbConnected,
-  sanitizeMongoUri
+  sanitizeMongoUri,
+  getMongoUri
 };

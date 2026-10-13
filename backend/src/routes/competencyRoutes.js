@@ -5,11 +5,12 @@ const {
   Question,
   AssessmentEvent
 } = require('../models');
+const { requireAuth, checkAssessmentOwnership } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /api/assessments/:id/competencies - Full details for interactive competency explorer
-router.get('/assessments/:id/competencies', async (req, res) => {
+router.get('/assessments/:id/competencies', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {

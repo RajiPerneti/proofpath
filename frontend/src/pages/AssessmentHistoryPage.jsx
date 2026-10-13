@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
 import {
   History,
   PlusCircle,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function AssessmentHistoryPage({ navigate, setAssessmentId }) {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
@@ -25,10 +27,18 @@ export default function AssessmentHistoryPage({ navigate, setAssessmentId }) {
   const loadAssessments = async () => {
     try {
       setLoading(true);
-      const data = await api.getAssessments();
+      if (!isAuthenticated) {
+        setAssessments([]);
+        return;
+      }
+      const data = await api.getAssessments().catch((err) => {
+        console.warn('Could not load assessments:', err.message);
+        return { assessments: [] };
+      });
       setAssessments(data.assessments || []);
     } catch (err) {
       console.error(err);
+      setAssessments([]);
     } finally {
       setLoading(false);
     }
@@ -36,7 +46,7 @@ export default function AssessmentHistoryPage({ navigate, setAssessmentId }) {
 
   useEffect(() => {
     loadAssessments();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleDelete = async (id, title, e) => {
     e.stopPropagation();
@@ -109,6 +119,31 @@ export default function AssessmentHistoryPage({ navigate, setAssessmentId }) {
           <span>New Assessment</span>
         </button>
       </div>
+
+      {/* Guest Mode Callout */}
+      {!isAuthenticated && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs shrink-0">
+              <Layers className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-900">
+                Sign in to view your assessments
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Each user account has isolated, private access to their created assessments and evidence reports.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openAuthModal('login')}
+            className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+          >
+            Sign In / Register
+          </button>
+        </div>
+      )}
 
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

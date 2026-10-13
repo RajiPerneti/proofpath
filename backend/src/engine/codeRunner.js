@@ -30,6 +30,9 @@ async function runPythonCodeSafely(candidateCode, testCases) {
   const scriptId = crypto.randomBytes(8).toString('hex');
   const scriptPath = path.join(tempDir, `solution_${scriptId}.py`);
 
+  const cleanCandidateCode = (candidateCode || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const indentedCandidateCode = cleanCandidateCode.split('\n').map(l => l.trim().length > 0 ? '    ' + l : '').join('\n');
+
   // Python test wrapper script with security lockdown
   const pythonScript = `
 import sys
@@ -55,7 +58,7 @@ test_results = []
 
 # --- Candidate Solution Start ---
 try:
-${candidateCode.split('\n').map(l => '    ' + l).join('\n')}
+${indentedCandidateCode}
 except Exception as e:
     print(json.dumps({
         "error": f"Compilation / Syntax Error: {str(e)}",

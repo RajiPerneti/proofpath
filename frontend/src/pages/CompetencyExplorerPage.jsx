@@ -32,7 +32,12 @@ export default function CompetencyExplorerPage({ assessmentId, navigate }) {
         setLoading(false);
       }
     }
-    if (assessmentId) load();
+    if (assessmentId) {
+      load();
+    } else {
+      setLoading(false);
+      setError('No assessment selected.');
+    }
   }, [assessmentId]);
 
   if (loading) {

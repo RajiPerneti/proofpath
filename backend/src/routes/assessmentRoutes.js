@@ -10,6 +10,7 @@ const {
 } = require('../models');
 const { JOB_TEMPLATES } = require('../db/seedData');
 const { isGeminiConfigured } = require('../ai/geminiService');
+const { requireAuth, checkAssessmentOwnership } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -27,10 +28,11 @@ router.get('/templates', (req, res) => {
   });
 });
 
-// GET /api/assessments - List all assessments for history
-router.get('/assessments', async (req, res) => {
+// GET /api/assessments - List all assessments owned by authenticated user
+router.get('/assessments', requireAuth, async (req, res) => {
   try {
-    const assessments = await Assessment.find().sort({ created_at: -1 }).lean();
+    const filter = req.user.role === 'admin' ? {} : { user_id: req.user.id };
+    const assessments = await Assessment.find(filter).sort({ created_at: -1 }).lean();
 
     const enriched = await Promise.all(
       assessments.map(async (a) => {
@@ -57,14 +59,16 @@ router.get('/assessments', async (req, res) => {
 });
 
 // POST /api/assessments - Create a new assessment
-router.post('/assessments', async (req, res) => {
+router.post('/assessments', requireAuth, async (req, res) => {
   const {
     jobTitle,
     jobDescription,
     candidateName,
     candidateProfile,
     templateId,
-    maxQuestions = 5
+    maxQuestions = 5,
+    resumeFilename = null,
+    resumeText = null
   } = req.body;
 
   if (!jobTitle || !candidateName) {
@@ -87,11 +91,14 @@ router.post('/assessments', async (req, res) => {
     // Insert assessment record
     const newAssessment = await Assessment.create({
       id: assessmentId,
+      user_id: req.user.id,
       title: `${jobTitle} - ${candidateName}`,
       job_title: jobTitle,
       job_description: jobDescription || selectedTemplate.description,
       candidate_name: candidateName,
       candidate_profile: candidateProfile || selectedTemplate.candidateProfile,
+      resume_filename: resumeFilename,
+      resume_text: resumeText,
       status: 'in_progress',
       max_questions: maxQuestions,
       current_question_index: 0,
@@ -210,11 +217,11 @@ router.post('/assessments', async (req, res) => {
 });
 
 // GET /api/assessments/:id - Fetch full assessment status
-router.get('/assessments/:id', async (req, res) => {
+router.get('/assessments/:id', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const assessment = await Assessment.findOne({ id }).lean();
+    const assessment = req.assessment || (await Assessment.findOne({ id }).lean());
     if (!assessment) {
       return res.status(404).json({ error: 'Assessment not found' });
     }
@@ -248,7 +255,7 @@ router.get('/assessments/:id', async (req, res) => {
 });
 
 // DELETE /api/assessments/:id - Delete an assessment
-router.delete('/assessments/:id', async (req, res) => {
+router.delete('/assessments/:id', requireAuth, checkAssessmentOwnership, async (req, res) => {
   const { id } = req.params;
 
   try {

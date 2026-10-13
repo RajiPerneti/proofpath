@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 import DecisionBanner from '../components/DecisionBanner';
+import CameraPreview from '../components/CameraPreview';
 import {
   Compass,
   Send,
@@ -12,7 +13,9 @@ import {
   Terminal,
   ArrowRight,
   Quote,
-  Clock
+  Clock,
+  Mic,
+  MicOff
 } from 'lucide-react';
 
 export default function InterviewWorkspacePage({ assessmentId, navigate }) {
@@ -27,25 +30,123 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [error, setError] = useState(null);
 
+  // Voice-to-Text State
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState(null);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setSpeechSupported(!!SpeechRecognition);
+  }, []);
+
+  const toggleSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    setSpeechError(null);
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let finalChunk = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalChunk += event.results[i][0].transcript;
+          }
+        }
+        if (finalChunk.trim()) {
+          setResponseText((prev) => {
+            const separator = prev && !prev.endsWith(' ') ? ' ' : '';
+            return `${prev}${separator}${finalChunk.trim()}`;
+          });
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission denied. Please allow microphone access.');
+        } else if (event.error === 'no-speech') {
+          // No speech detected, wait
+        } else {
+          setSpeechError(`Voice error: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Failed to start speech recognition:', err);
+      setSpeechError(err.message || 'Unable to start speech recognition.');
+      setIsListening(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+    };
+  }, []);
+
   // Load assessment state
   const loadState = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await api.getAssessment(assessmentId);
+      if (!data || !data.assessment) {
+        throw new Error('Assessment not found or inaccessible.');
+      }
       setAssessment(data.assessment);
-      setCurrentQuestion(data.currentQuestion);
+      setCurrentQuestion(data.currentQuestion || null);
       setCompetencies(data.competencies || []);
-      setLastDecision(data.lastDecision);
+      setLastDecision(data.lastDecision || null);
 
       if (data.assessment.status === 'completed') {
         setIsCompleted(true);
       }
 
-      // Fetch evidence events
-      const evData = await api.getEvents(assessmentId);
-      setEvents(evData.events || []);
+      // Fetch evidence events safely
+      try {
+        const evData = await api.getEvents(assessmentId);
+        setEvents(evData.events || []);
+      } catch (evErr) {
+        console.warn('Could not load events:', evErr);
+        setEvents([]);
+      }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to load assessment');
     } finally {
       setLoading(false);
     }
@@ -54,6 +155,9 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
   useEffect(() => {
     if (assessmentId) {
       loadState();
+    } else {
+      setLoading(false);
+      setError('No assessment selected. Please select or create an assessment.');
     }
   }, [assessmentId]);
 
@@ -62,6 +166,13 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
     if (!responseText.trim()) {
       alert('Please enter a response before submitting.');
       return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
     }
 
     setSubmitting(true);
@@ -224,6 +335,9 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* COLUMN 1: LEFT - Questions & Progress (3 Cols) */}
         <div className="lg:col-span-3 space-y-4">
+          {/* Optional Local Camera Preview */}
+          <CameraPreview compact={true} />
+
           {/* Question Sequence / Stepper */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
@@ -267,7 +381,7 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
                         </span>
                         <span className="font-semibold text-slate-900 leading-snug break-words">
                           {isPast
-                            ? event.competency_name || `Question #${idx + 1}`
+                            ? event?.competency_name || `Question #${idx + 1}`
                             : isCurrent
                             ? currentQuestion?.competency_name || `Active Question`
                             : `Upcoming Inquiry`}
@@ -276,7 +390,7 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
 
                       {isPast && (
                         <div className="shrink-0">
-                          <StatusBadge status={event.evaluation_status} size="sm" />
+                          <StatusBadge status={event?.evaluation_status} size="sm" />
                         </div>
                       )}
                       {isCurrent && (
@@ -424,9 +538,39 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
               <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                      Candidate Response
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                        Candidate Response
+                      </label>
+                      <button
+                        type="button"
+                        onClick={toggleSpeechRecognition}
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all border ${
+                          isListening
+                            ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                            : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                        }`}
+                        title={
+                          speechSupported
+                            ? isListening
+                              ? 'Click to finish voice recording'
+                              : 'Click to dictate your answer using speech recognition'
+                            : 'Speech recognition requires a browser supporting Web Speech API (Chrome, Edge)'
+                        }
+                      >
+                        {isListening ? (
+                          <>
+                            <MicOff className="h-3 w-3 text-rose-600" />
+                            <span>Listening... (Click to stop)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="h-3 w-3 text-indigo-600" />
+                            <span>Voice Dictation</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
                     {/* Presets chips */}
                     <div className="flex flex-wrap items-center gap-1 text-[10px]">
@@ -484,6 +628,22 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
                       </button>
                     </div>
                   </div>
+
+                  {speechError && (
+                    <div className="mb-2 flex items-start gap-1.5 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
+                      <AlertCircle className="h-3.5 w-3.5 text-rose-600 mt-0.5 shrink-0" />
+                      <span>{speechError}</span>
+                    </div>
+                  )}
+
+                  {isListening && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50/70 p-2 text-xs text-indigo-800">
+                      <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping shrink-0" />
+                      <span className="font-medium text-[11px]">
+                        Dictation active: speak clearly into your microphone. Words are transcribed into the answer box below and can be edited anytime.
+                      </span>
+                    </div>
+                  )}
 
                   <textarea
                     rows={8}
@@ -597,22 +757,30 @@ export default function InterviewWorkspacePage({ assessmentId, navigate }) {
             ) : (
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 {events.slice(-3).reverse().map((ev, idx) => {
-                  const excerpts = Array.isArray(ev.supporting_excerpts)
-                    ? ev.supporting_excerpts
-                    : JSON.parse(ev.supporting_excerpts || '[]');
+                  let excerpts = [];
+                  if (Array.isArray(ev?.supporting_excerpts)) {
+                    excerpts = ev.supporting_excerpts;
+                  } else if (typeof ev?.supporting_excerpts === 'string') {
+                    try {
+                      const parsed = JSON.parse(ev.supporting_excerpts);
+                      excerpts = Array.isArray(parsed) ? parsed : [ev.supporting_excerpts];
+                    } catch {
+                      excerpts = [ev.supporting_excerpts];
+                    }
+                  }
                   const quote = excerpts[0] || 'Technical criteria evaluated.';
 
                   return (
                     <div
-                      key={ev.id || idx}
+                      key={ev?.id || idx}
                       className="rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 text-xs space-y-1.5"
                     >
                       <div className="flex items-start justify-between gap-1.5 text-[10px]">
                         <span className="font-semibold text-slate-700 break-words leading-tight">
-                          {ev.competency_name || `Event #${ev.event_sequence}`}
+                          {ev?.competency_name || `Event #${ev?.event_sequence || idx + 1}`}
                         </span>
                         <div className="shrink-0">
-                          <StatusBadge status={ev.evaluation_status} size="sm" />
+                          <StatusBadge status={ev?.evaluation_status} size="sm" />
                         </div>
                       </div>
                       <div className="flex items-start gap-1.5 text-slate-600 bg-white p-2 rounded border border-slate-100 text-[11px]">
